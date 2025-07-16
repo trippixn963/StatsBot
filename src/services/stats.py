@@ -436,7 +436,7 @@ class StatsBot(discord.Client):
         )
         self.bg_task = self.loop.create_task(self.background_task())
         self.heartbeat_task = self.loop.create_task(self.monitoring_service.update_heartbeat())
-        self.rich_presence_task = self.loop.create_task(self.rich_presence_service.update_presence())
+        self.rich_presence_task = self.loop.create_task(self.rich_presence_service.start())
         await self.stats_service.start_daily_stats_task()  # Start daily stats task
         
     async def background_task(self):
