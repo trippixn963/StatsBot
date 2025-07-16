@@ -22,8 +22,7 @@ class RichPresenceService:
         self.presence_types = [
             'member_count',
             'online_count',
-            'uptime',
-            'version'
+            'ban_count'
         ]
         
         # Log initialization
@@ -36,27 +35,6 @@ class RichPresenceService:
             ],
             emoji="👤"
         )
-    
-    async def set_startup_presence(self):
-        """Set initial presence when bot starts up."""
-        try:
-            activity = discord.Activity(
-                type=discord.ActivityType.playing,
-                name="🚀 Starting up..."
-            )
-            await self.bot.change_presence(
-                status=discord.Status.idle,
-                activity=activity
-            )
-        except Exception as e:
-            log_perfect_tree_section(
-                "Rich Presence Error",
-                [
-                    ("error", str(e)),
-                    ("type", "startup")
-                ],
-                emoji="❌"
-            )
     
     async def update_presence(self):
         """Update the bot's presence with the next status in rotation."""
@@ -79,21 +57,17 @@ class RichPresenceService:
                     type=discord.ActivityType.watching,
                     name=f"{online_count:,} online"
                 )
-            elif presence_type == 'uptime':
-                uptime = datetime.now(timezone(timedelta(hours=-5))) - self.bot.start_time
-                days = uptime.days
-                hours = uptime.seconds // 3600
+            else:  # ban_count
+                bans = [entry async for entry in guild.bans()]
                 activity = discord.Activity(
-                    type=discord.ActivityType.playing,
-                    name=f"Up {days}d {hours}h"
-                )
-            else:  # version
-                activity = discord.Activity(
-                    type=discord.ActivityType.playing,
-                    name="v1.0.0"
+                    type=discord.ActivityType.watching,
+                    name=f"{len(bans):,} bans"
                 )
             
-            await self.bot.change_presence(activity=activity)
+            await self.bot.change_presence(
+                status=discord.Status.online,
+                activity=activity
+            )
             
             # Update index for next rotation
             self.current_index = (self.current_index + 1) % len(self.presence_types)
@@ -111,7 +85,6 @@ class RichPresenceService:
     async def start(self):
         """Start the rich presence update loop."""
         await self.bot.wait_until_ready()
-        await self.set_startup_presence()
         
         while not self.bot.is_closed():
             await self.update_presence()
