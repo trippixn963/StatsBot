@@ -27,6 +27,7 @@ from .stats_tracker import StatsTracker
 from .monitoring import MonitoringService
 from .rich_presence import RichPresenceService
 import os
+import random
 
 class StatsService:
     """
@@ -57,6 +58,12 @@ class StatsService:
         
         self.bot = bot
         self.stats_tracker = StatsTracker()
+        
+        # Set up EST timezone
+        self.est_tz = timezone(timedelta(hours=-5))
+        
+        # Generate run ID
+        self.run_id = ''.join(random.choices('0123456789ABCDEF', k=8))
         
         # Load channel IDs from environment
         self.member_count_channel_id = int(os.getenv('MEMBER_COUNT_CHANNEL_ID'))

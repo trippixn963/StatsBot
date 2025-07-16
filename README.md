@@ -1,42 +1,51 @@
-# StatsBot
+![StatsBot Banner](https://raw.githubusercontent.com/trippixn963/StatsBot/main/images/BANNER.gif)
 
-A fully automated Discord statistics bot that tracks server activity and provides real-time updates through channel names and detailed reports.
+# StatsBot 🤖
 
-## Features
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Discord](https://img.shields.io/badge/Discord-Syria-7289DA?logo=discord)](https://discord.gg/syria)
+[![Python](https://img.shields.io/badge/Python-3.8+-blue?logo=python)](https://www.python.org/downloads/)
+[![Status](https://img.shields.io/badge/Status-Stable-green)]()
 
-- **Automated Channel Statistics**
+A fully automated Discord statistics bot that tracks server activity and provides real-time updates through channel names and detailed reports. Originally created for [discord.gg/syria](https://discord.gg/syria).
+
+> ⚠️ **DISCLAIMER**: This is a "take as is" project. No support, updates, or help will be provided. Use at your own discretion.
+
+## Features 🚀
+
+- **Automated Channel Statistics** 📊
   - Member count updates
   - Online member tracking
   - Ban count monitoring
   - Rate-limit aware with exponential backoff
 
-- **Daily Statistics Reports**
+- **Daily Statistics Reports** 📈
   - Sent automatically at 12 AM EST
   - Detailed member activity
   - Server growth metrics
   - Moderation activity summary
 
-- **Real-time Monitoring**
+- **Real-time Monitoring** 🔍
   - Hourly heartbeat messages
   - System performance metrics
   - Recent member activity tracking
   - Log monitoring and reporting
 
-## Project Structure
+## Project Structure 📁
 
 ```
 StatsBot/
 ├── config/           # Configuration files and environment variables
 ├── data/            # JSON data storage for statistics
-├── logs/            # Daily rotating logs (errors, general logs, JSON logs)
+├── logs/            # Daily rotating logs
 ├── src/             # Source code
-│   ├── services/    # Core services (monitoring, stats, presence)
-│   └── utils/       # Utility functions and helpers
+│   ├── services/    # Core services
+│   └── utils/       # Utility functions
 ├── main.py          # Application entry point
 └── requirements.txt # Project dependencies
 ```
 
-## Setup
+## Setup ⚙️
 
 1. Clone the repository
 ```bash
@@ -64,7 +73,7 @@ STATS_CHANNEL_ID=channel_id
 python main.py
 ```
 
-## Environment Variables
+## Environment Variables 🔐
 
 | Variable | Description |
 |----------|-------------|
@@ -75,15 +84,15 @@ python main.py
 | HEARTBEAT_CHANNEL_ID | Channel for heartbeat messages |
 | STATS_CHANNEL_ID | Channel for daily statistics |
 
-## Features in Detail
+## Features in Detail ✨
 
 ### Channel Statistics
 - Updates channel names to reflect current server statistics
-- Implements intelligent rate limiting to avoid Discord API restrictions
+- Implements intelligent rate limiting
 - Uses exponential backoff for rate limit handling
 
 ### Daily Statistics
-- Automatically generates comprehensive daily reports
+- Automatically generates daily reports
 - Tracks member joins and leaves
 - Monitors server growth trends
 - Provides moderation activity summary
@@ -94,18 +103,17 @@ python main.py
 - Recent member activity
 - Log monitoring
 
-## Logging
+## Logging System 📝
 
-The bot uses a sophisticated logging system with:
 - Daily rotating log files
 - Separate error logging
 - JSON-formatted logs for analysis
 - Rich console output
 
-## Contributing
+## Important Notice ⚠️
 
-Feel free to submit issues and enhancement requests!
+This bot is provided as-is without any warranty or support. It was specifically created for [discord.gg/syria](https://discord.gg/syria) and is being shared for reference purposes only. No maintenance, updates, or assistance will be provided.
 
 ## License
 
-[MIT License](LICENSE) 
+[MIT License](LICENSE) © 2025 John 

@@ -43,6 +43,7 @@ class TreeLogger:
     def __init__(self):
         # Use fixed EST timezone (UTC-5) instead of US/Eastern
         self.est_tz = timezone(timedelta(hours=-5))  # Always EST, never EDT
+        self.start_time = datetime.now(self.est_tz)  # Add start_time
         self.log_dir = "logs"
         self.run_id = self._generate_run_id()
         
@@ -61,12 +62,13 @@ class TreeLogger:
             datefmt='%m/%d %I:%M %p EST'
         )
         
-        # Set up root logger
+        # Get root logger
         root_logger = logging.getLogger()
         root_logger.setLevel(logging.INFO)
         
-        # Clear any existing handlers
-        root_logger.handlers = []
+        # Remove any existing handlers
+        for handler in root_logger.handlers[:]:
+            root_logger.removeHandler(handler)
         
         # Console handler
         console_handler = logging.StreamHandler()
