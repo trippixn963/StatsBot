@@ -49,19 +49,19 @@ class RichPresenceService:
                 member_count = len(guild.members)
                 activity = discord.Activity(
                     type=discord.ActivityType.watching,
-                    name=f"{member_count:,} members"
+                    name=f"👥 {member_count:,} members"
                 )
             elif presence_type == 'online_count':
                 online_count = sum(1 for m in guild.members if m.status != discord.Status.offline)
                 activity = discord.Activity(
                     type=discord.ActivityType.watching,
-                    name=f"{online_count:,} online"
+                    name=f"🟢 {online_count:,} online"
                 )
             else:  # ban_count
                 bans = [entry async for entry in guild.bans()]
                 activity = discord.Activity(
                     type=discord.ActivityType.watching,
-                    name=f"{len(bans):,} bans"
+                    name=f"🔨 {len(bans):,} bans"
                 )
             
             await self.bot.change_presence(
