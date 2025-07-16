@@ -313,7 +313,19 @@ class StatsService:
         if datetime.now(self.est_tz) - self.last_member_update < timedelta(seconds=self.member_backoff):
             return
             
-        new_name = f"Members: {guild.member_count}"
+        channel = self.bot.get_channel(self.member_count_channel_id)
+        if not channel:
+            return
+            
+        # Extract the current name prefix before the number
+        current_name = channel.name
+        name_parts = current_name.split(":")
+        if len(name_parts) > 1:
+            prefix = name_parts[0] + ":"
+        else:
+            prefix = "Members:"  # Fallback if no prefix found
+            
+        new_name = f"{prefix} {guild.member_count}"
         if await self.update_channel_name(self.member_count_channel_id, new_name, 'member_backoff'):
             self.last_member_update = datetime.now(self.est_tz)
             self.member_count_cache = guild.member_count
@@ -323,8 +335,20 @@ class StatsService:
         if datetime.now(self.est_tz) - self.last_online_update < timedelta(seconds=self.online_backoff):
             return
             
+        channel = self.bot.get_channel(self.online_count_channel_id)
+        if not channel:
+            return
+            
+        # Extract the current name prefix before the number
+        current_name = channel.name
+        name_parts = current_name.split(":")
+        if len(name_parts) > 1:
+            prefix = name_parts[0] + ":"
+        else:
+            prefix = "Online:"  # Fallback if no prefix found
+            
         online_count = len([m for m in guild.members if m.status != discord.Status.offline])
-        new_name = f"Online: {online_count}"
+        new_name = f"{prefix} {online_count}"
         if await self.update_channel_name(self.online_count_channel_id, new_name, 'online_backoff'):
             self.last_online_update = datetime.now(self.est_tz)
             self.online_count_cache = online_count
@@ -334,8 +358,20 @@ class StatsService:
         if datetime.now(self.est_tz) - self.last_ban_update < timedelta(seconds=self.ban_backoff):
             return
             
+        channel = self.bot.get_channel(self.ban_count_channel_id)
+        if not channel:
+            return
+            
+        # Extract the current name prefix before the number
+        current_name = channel.name
+        name_parts = current_name.split(":")
+        if len(name_parts) > 1:
+            prefix = name_parts[0] + ":"
+        else:
+            prefix = "Bans:"  # Fallback if no prefix found
+            
         bans = [entry async for entry in guild.bans()]
-        new_name = f"Bans: {len(bans)}"
+        new_name = f"{prefix} {len(bans)}"
         if await self.update_channel_name(self.ban_count_channel_id, new_name, 'ban_backoff'):
             self.last_ban_update = datetime.now(self.est_tz)
             self.ban_count_cache = len(bans)
