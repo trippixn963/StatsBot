@@ -61,7 +61,7 @@ class RichPresenceService:
                 bans = [entry async for entry in guild.bans()]
                 activity = discord.Activity(
                     type=discord.ActivityType.watching,
-                    name=f"🔨 {len(bans):,} bans"
+                    name=f"🚫 {len(bans):,} bans"
                 )
             
             await self.bot.change_presence(

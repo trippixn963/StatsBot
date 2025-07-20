@@ -326,7 +326,7 @@ class StatsService:
         else:
             prefix = "Members:"  # Fallback if no prefix found
             
-        new_name = f"{prefix} {guild.member_count}"
+        new_name = f"{prefix} {guild.member_count:,}"
         if await self.update_channel_name(self.member_count_channel_id, new_name, 'member_backoff'):
             self.last_member_update = datetime.now(self.est_tz)
             self.member_count_cache = guild.member_count
