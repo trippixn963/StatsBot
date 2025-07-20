@@ -131,7 +131,7 @@ StatsBot/
 ├── 📊 data/                     # Statistics storage
 │   ├── 📈 member_stats.json     # Member analytics
 │   └── 📋 final_stats.json      # Processed statistics
-├── 📝 logs/                     # Rotating log system
+├── 📝 logs/                     # Rotating log system (created at runtime)
 │   └── 📅 YYYY-MM-DD/           # Daily log directories
 ├── 🧪 tests/                    # Comprehensive test suite
 │   ├── 🔧 conftest.py           # Test configuration & fixtures
@@ -140,8 +140,7 @@ StatsBot/
 │   ├── 🧪 unit/                 # Unit tests (85% coverage)
 │   ├── 🔗 integration/          # Integration tests
 │   └── ⚡ performance/          # Performance benchmarks
-├── 🔄 sync_logs_daemon.py       # Log synchronization daemon
-├── 📜 manage_sync.sh            # Log management script
+
 └── 🎯 src/                      # Core application code
     ├── 🏗️ core/                 # Core infrastructure
     │   ├── 🤖 bot.py             # Optimized bot implementation
