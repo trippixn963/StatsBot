@@ -44,4 +44,4 @@ Thumbs.db
 
 # Project specific
 *.pid
-logsync_daemon.pid 
+logsync_daemon.pid config/__pycache__/
