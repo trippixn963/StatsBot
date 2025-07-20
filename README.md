@@ -121,7 +121,10 @@ StatsBot/
 ├── 📋 requirements.txt           # Production dependencies  
 ├── ⚙️ pyproject.toml            # Development configuration
 ├── 📖 OPTIMIZATION_GUIDE.md     # Complete optimization docs
-├── 🖼️ images/                   # Assets and media
+├── 📄 LICENSE                   # MIT License
+├── 🖼️ images/                   # Assets and media (banner, profile)
+├── 🛠️ scripts/                  # Utility scripts
+│   └── 📊 benchmark.py          # Performance validation
 ├── 📁 config/                   # Configuration management
 │   ├── 🔐 .env                  # Environment variables
 │   └── ⚙️ config.py             # Configuration loader
@@ -131,13 +134,14 @@ StatsBot/
 ├── 📝 logs/                     # Rotating log system
 │   └── 📅 YYYY-MM-DD/           # Daily log directories
 ├── 🧪 tests/                    # Comprehensive test suite
-│   ├── 🔧 conftest.py           # Test configuration
+│   ├── 🔧 conftest.py           # Test configuration & fixtures
 │   ├── 🎭 mocks.py              # Discord API mocks
+│   ├── 📚 __init__.py           # Test package initialization
 │   ├── 🧪 unit/                 # Unit tests (85% coverage)
 │   ├── 🔗 integration/          # Integration tests
 │   └── ⚡ performance/          # Performance benchmarks
-├── 🛠️ scripts/                  # Utility scripts
-│   └── 📊 benchmark.py          # Performance validation
+├── 🔄 sync_logs_daemon.py       # Log synchronization daemon
+├── 📜 manage_sync.sh            # Log management script
 └── 🎯 src/                      # Core application code
     ├── 🏗️ core/                 # Core infrastructure
     │   ├── 🤖 bot.py             # Optimized bot implementation
@@ -145,21 +149,28 @@ StatsBot/
     │   ├── ❌ exceptions.py      # Custom exception classes
     │   └── 🎮 service_coordinator.py # Service orchestration
     ├── 🔧 services/              # Business logic services
-    │   ├── 📊 monitoring/        # System monitoring
-    │   ├── 🎭 presence/          # Rich presence management
-    │   └── 📈 stats/             # Statistics processing
+    │   ├── 📊 monitoring.py      # System monitoring (legacy)
+    │   ├── 📊 monitoring/        # Enhanced monitoring service
+    │   ├── 📈 stats.py           # Statistics service (legacy)
+    │   ├── 📈 stats/             # Enhanced statistics processing
+    │   ├── 📊 stats_tracker.py   # Statistics tracking
+    │   ├── 🎭 rich_presence.py   # Rich presence (legacy)
+    │   └── 🎭 presence/          # Enhanced rich presence management
     ├── 🎨 types/                 # Type definitions
     │   └── 📋 models.py          # Data models and schemas
     └── 🛠️ utils/                 # Utility modules
+        ├── 🌲 tree_log.py       # Enhanced logging utilities
         ├── ⚡ performance.py     # Performance monitoring
         ├── 💾 memory_optimizer.py # Memory optimization
         ├── 🌐 network_optimizer.py # Network efficiency
         ├── ✅ config_validator.py # Configuration validation
+        ├── 🔧 resource_manager.py # Resource management
         ├── 🔄 async_utils/       # Async utilities
         ├── 💾 cache/             # Caching systems
         ├── ❌ error_handling/    # Error handling patterns
         ├── 📁 file_io/           # File operations
-        └── 📝 logging/           # Logging infrastructure
+        ├── 📝 logging/           # Logging infrastructure
+        └── ⚡ performance/       # Performance monitoring tools
 ```
 
 ### 🎯 **Core Components**
