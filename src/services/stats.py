@@ -26,6 +26,7 @@ from src.utils.tree_log import log_perfect_tree_section, log_error_with_tracebac
 from .stats_tracker import StatsTracker
 from .monitoring import MonitoringService
 from .rich_presence import RichPresenceService
+from .credits import CreditsService
 import os
 import random
 
@@ -418,6 +419,7 @@ class StatsBot(discord.Client):
         self.stats_service = StatsService(self)
         self.monitoring_service = MonitoringService(self, int(os.getenv('HEARTBEAT_CHANNEL_ID')))
         self.rich_presence_service = RichPresenceService(self)
+        self.credits_service = CreditsService(self)
         self.shutdown_event = None
         
         # Log initialization complete
@@ -438,6 +440,7 @@ class StatsBot(discord.Client):
         self.heartbeat_task = self.loop.create_task(self.monitoring_service.update_heartbeat())
         self.rich_presence_task = self.loop.create_task(self.rich_presence_service.start())
         await self.stats_service.start_daily_stats_task()  # Start daily stats task
+        await self.credits_service.setup_commands()  # Setup slash commands
         
     async def background_task(self):
         """Background task to update channel statistics."""
@@ -503,6 +506,17 @@ class StatsBot(discord.Client):
         
         # Set startup rich presence
         await self.rich_presence_service.set_startup_presence()
+        
+        # Sync slash commands
+        try:
+            synced = await self.tree.sync()
+            log_perfect_tree_section(
+                "Slash Commands",
+                [("status", "Synced"), ("count", str(len(synced)))],
+                emoji="⚡"
+            )
+        except Exception as e:
+            log_error_with_traceback("Failed to sync slash commands", e)
         
     async def on_member_join(self, member: discord.Member):
         """Handle member join event."""
