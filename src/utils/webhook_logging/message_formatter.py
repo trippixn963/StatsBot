@@ -786,8 +786,8 @@ class MessageFormatter:
                 content=content,
                 username="StatsBot Member Events"
             )
-def lo
-ad_template_from_file(file_path: str) -> Dict:
+
+def load_template_from_file(file_path: str) -> Dict:
     """
     Load a template from a JSON file.
     

@@ -20,7 +20,7 @@ from ..services.monitoring.service import MonitoringService
 from ..services.presence.service import RichPresenceService
 from ..utils.logging.structured_logger import StructuredLogger
 from ..utils.async_utils.task_manager import TaskManager
-from ..utils.async_utils.event_queue import EventQueue, EventBatcher
+# Import EventQueue and EventBatcher lazily to avoid circular imports
 from ..utils.error_handling.connection_recovery import (
     ConnectionRecoveryManager, StateConsistencyManager, FallbackManager
 )
@@ -119,6 +119,9 @@ class OptimizedStatsBot(discord.Client):
         self.stats_service: Optional[OptimizedStatsService] = None
         self.monitoring_service: Optional[MonitoringService] = None
         self.rich_presence_service: Optional[RichPresenceService] = None
+        
+        # Import EventQueue and EventBatcher lazily to avoid circular imports
+        from ..utils.async_utils.event_queue import EventQueue, EventBatcher
         
         # Initialize event queue for member events
         self.member_event_queue = EventQueue(

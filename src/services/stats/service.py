@@ -17,7 +17,7 @@ from typing import Dict, List, Optional, Tuple, Any, Set
 from src.core.config import get_config
 from src.core.exceptions import RateLimitError, DiscordAPIError
 from src.types.models import ChannelStats, EventType, MemberEvent
-from src.utils.cache.cache_manager import CacheManager
+# Import CacheManager lazily to avoid circular imports
 from src.utils.error_handling.backoff import exponential_backoff
 from src.utils.logging.structured_logger import StructuredLogger, timed
 
@@ -64,6 +64,8 @@ class OptimizedStatsService:
         """
         self.bot = bot
         self.stats_tracker = StatsTracker()
+        # Import CacheManager lazily to avoid circular imports
+        from src.utils.cache.cache_manager import CacheManager
         self.cache = CacheManager(default_ttl=cache_ttl)
         self.logger = logger or StructuredLogger("stats_service")
         

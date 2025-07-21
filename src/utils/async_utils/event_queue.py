@@ -13,7 +13,39 @@ from typing import Dict, List, Any, Callable, Awaitable, TypeVar, Generic, Optio
 from collections import defaultdict
 from dataclasses import dataclass, field
 
-from ...core.exceptions import AsyncOperationError
+# Define a local AsyncOperationError to avoid circular imports
+class AsyncOperationError(Exception):
+    """
+    Raised when asynchronous operations fail.
+    
+    This is a local version of the exception to avoid circular imports.
+    """
+    
+    def __init__(
+        self, 
+        message: str, 
+        operation_name: Optional[str] = None,
+        task_id: Optional[str] = None,
+        timeout: Optional[float] = None,
+        was_cancelled: bool = False
+    ):
+        super().__init__(message)
+        self.message = message
+        self.operation_name = operation_name
+        self.task_id = task_id
+        self.timeout = timeout
+        self.was_cancelled = was_cancelled
+        self.error_code = "ASYNC_OPERATION_ERROR"
+        self.context = {}
+        if operation_name:
+            self.context['operation_name'] = operation_name
+        if task_id:
+            self.context['task_id'] = task_id
+        if timeout is not None:
+            self.context['timeout'] = timeout
+        self.context['was_cancelled'] = was_cancelled
+
+# Import StructuredLogger
 from ...utils.logging.structured_logger import StructuredLogger
 
 T = TypeVar('T')

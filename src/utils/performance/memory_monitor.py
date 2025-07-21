@@ -1,402 +1,372 @@
 """
-Memory usage monitoring and alerting for resource-constrained environments.
+Memory usage monitoring and optimization.
 
-This module provides tools for monitoring memory usage, setting up alerts
-for high memory usage, and implementing memory optimization strategies.
+This module provides tools for monitoring memory usage, detecting memory leaks,
+and optimizing memory usage through garbage collection and other techniques.
 """
 
-import os
 import gc
-import psutil
-import asyncio
-import logging
+import os
+import sys
 import time
-from typing import Dict, List, Optional, Any, Callable, Set, Tuple
+import logging
+import asyncio
+import tracemalloc
+from typing import Dict, List, Optional, Any, Callable, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime
-import threading
-import weakref
 
-from src.types.models import MemoryStats, ResourceUsage
-from src.utils.logging.structured_logger import StructuredLogger
+logger = logging.getLogger("performance.memory")
+
+@dataclass
+class MemoryAlert:
+    """Memory usage alert with context information."""
+    
+    timestamp: datetime
+    usage_mb: float
+    threshold_mb: float
+    context: Dict[str, Any] = field(default_factory=dict)
+    
+    def __str__(self) -> str:
+        """Format alert as string."""
+        return f"Memory Alert: {self.usage_mb:.2f}MB (threshold: {self.threshold_mb:.2f}MB)"
 
 
 class MemoryMonitor:
     """
-    Memory usage monitor with alerting capabilities.
+    Memory usage monitoring and optimization.
     
-    This class provides tools for monitoring memory usage, setting up alerts
-    for high memory usage, and implementing memory optimization strategies.
-    It can run in the background and trigger alerts or cleanup actions when
-    memory usage exceeds configured thresholds.
+    This class provides tools for monitoring memory usage, detecting memory leaks,
+    and optimizing memory usage through garbage collection and other techniques.
     
     Attributes:
-        warning_threshold: Percentage at which to log memory warnings
-        critical_threshold: Percentage at which to trigger cleanup
-        check_interval: Seconds between memory checks
-        logger: Logger for memory-related messages
-        _running: Whether the monitor is currently running
-        _monitor_task: Background task for memory monitoring
+        warning_threshold: Memory usage threshold for warnings (MB)
+        critical_threshold: Memory usage threshold for critical alerts (MB)
+        check_interval: Interval between memory checks (seconds)
+        logger: Logger instance
     """
     
     def __init__(
         self,
-        warning_threshold: float = 75.0,
-        critical_threshold: float = 90.0,
+        warning_threshold: float = 100.0,
+        critical_threshold: float = 200.0,
         check_interval: int = 60,
-        logger: Optional[StructuredLogger] = None
+        logger: Optional[logging.Logger] = None
     ):
         """
-        Initialize a new memory monitor.
+        Initialize memory monitor.
         
         Args:
-            warning_threshold: Percentage at which to log memory warnings
-            critical_threshold: Percentage at which to trigger cleanup
-            check_interval: Seconds between memory checks
-            logger: Logger for memory-related messages
+            warning_threshold: Memory usage threshold for warnings (MB)
+            critical_threshold: Memory usage threshold for critical alerts (MB)
+            check_interval: Interval between memory checks (seconds)
+            logger: Logger instance (creates one if None)
         """
         self.warning_threshold = warning_threshold
         self.critical_threshold = critical_threshold
         self.check_interval = check_interval
-        self.logger = logger or logging.getLogger(__name__)
+        self.logger = logger or logging.getLogger("performance.memory")
+        
+        # Internal state
+        self._monitoring_task: Optional[asyncio.Task] = None
         self._running = False
-        self._monitor_task: Optional[asyncio.Task] = None
-        self._process = psutil.Process(os.getpid())
-        self._cleanup_callbacks: List[Callable[[], None]] = []
-        self._memory_history: List[MemoryStats] = []
-        self._history_lock = threading.Lock()
-        self._max_history_size = 100  # Keep last 100 measurements
+        self._recent_alerts: List[MemoryAlert] = []
+        self._peak_memory = 0.0
+        self._last_check = 0.0
+        self._tracemalloc_enabled = False
         
-    def get_memory_stats(self) -> MemoryStats:
-        """
-        Get current memory usage statistics.
-        
-        Returns:
-            MemoryStats object with current memory metrics
-        """
-        vm = psutil.virtual_memory()
-        
-        stats = MemoryStats(
-            total_bytes=vm.total,
-            used_bytes=vm.used,
-            available_bytes=vm.available,
-            percent_used=vm.percent,
-            timestamp=datetime.now()
-        )
-        
-        # Add to history with lock to prevent race conditions
-        with self._history_lock:
-            self._memory_history.append(stats)
-            if len(self._memory_history) > self._max_history_size:
-                self._memory_history = self._memory_history[-self._max_history_size:]
-                
-        return stats
-        
-    def get_process_memory_usage(self) -> Tuple[int, float]:
-        """
-        Get memory usage of the current process.
-        
-        Returns:
-            Tuple of (memory_bytes, memory_percent)
-        """
-        vm = psutil.virtual_memory()
-        process_memory = self._process.memory_info().rss
-        process_percent = (process_memory / vm.total) * 100
-        return process_memory, process_percent
-        
-    def register_cleanup_callback(self, callback: Callable[[], None]) -> None:
-        """
-        Register a callback function to be called during cleanup operations.
-        
-        Args:
-            callback: Function to call during cleanup
-        """
-        self._cleanup_callbacks.append(callback)
-        
+        # Statistics
+        self._stats = {
+            "checks": 0,
+            "warnings": 0,
+            "critical_alerts": 0,
+            "gc_collections": 0,
+            "memory_saved_mb": 0.0
+        }
+    
     async def start_monitoring(self) -> None:
-        """Start the background memory monitoring task."""
+        """Start memory monitoring task."""
         if self._running:
             return
             
         self._running = True
-        self._monitor_task = asyncio.create_task(self._monitor_memory())
-        if hasattr(self.logger, 'info'):
-            self.logger.info("Memory monitoring started")
-        else:
-            logging.info("Memory monitoring started")
-            
+        self._monitoring_task = asyncio.create_task(self._monitor_memory())
+        
+        self.logger.info(
+            f"Memory monitoring started (warning: {self.warning_threshold}MB, "
+            f"critical: {self.critical_threshold}MB, interval: {self.check_interval}s)"
+        )
+    
     async def stop_monitoring(self) -> None:
-        """Stop the memory monitoring task."""
+        """Stop memory monitoring task."""
         if not self._running:
             return
             
         self._running = False
-        if self._monitor_task:
-            self._monitor_task.cancel()
+        
+        if self._monitoring_task:
+            self._monitoring_task.cancel()
             try:
-                await self._monitor_task
+                await self._monitoring_task
             except asyncio.CancelledError:
                 pass
-            self._monitor_task = None
+            self._monitoring_task = None
             
-        if hasattr(self.logger, 'info'):
-            self.logger.info("Memory monitoring stopped")
-        else:
-            logging.info("Memory monitoring stopped")
-            
+        self.logger.info("Memory monitoring stopped")
+    
     async def _monitor_memory(self) -> None:
-        """Background task that periodically checks memory usage and triggers alerts if needed."""
+        """Periodic memory monitoring task."""
         while self._running:
             try:
-                stats = self.get_memory_stats()
-                process_memory, process_percent = self.get_process_memory_usage()
+                # Check memory usage
+                memory_usage = self._get_memory_usage()
+                self._stats["checks"] += 1
+                self._last_check = time.time()
                 
-                # Log warning if memory usage is high
-                if stats.percent_used > self.warning_threshold:
-                    if hasattr(self.logger, 'warning'):
-                        self.logger.warning(
-                            f"High memory usage detected: {stats.percent_used:.1f}% "
-                            f"(process: {process_percent:.1f}%)",
-                            memory_percent=stats.percent_used,
-                            process_percent=process_percent,
-                            available_mb=stats.available_bytes / (1024 * 1024)
-                        )
-                    else:
-                        logging.warning(
-                            f"High memory usage detected: {stats.percent_used:.1f}% "
-                            f"(process: {process_percent:.1f}%)"
-                        )
+                # Update peak memory
+                if memory_usage > self._peak_memory:
+                    self._peak_memory = memory_usage
                 
-                # Trigger cleanup if memory usage is critical
-                if stats.percent_used > self.critical_threshold:
-                    if hasattr(self.logger, 'warning'):
-                        self.logger.warning(
-                            f"Critical memory usage detected: {stats.percent_used:.1f}%, "
-                            f"performing cleanup",
-                            memory_percent=stats.percent_used,
-                            process_percent=process_percent,
-                            available_mb=stats.available_bytes / (1024 * 1024)
-                        )
-                    else:
-                        logging.warning(
-                            f"Critical memory usage detected: {stats.percent_used:.1f}%, "
-                            f"performing cleanup"
-                        )
-                    await self.cleanup_memory()
+                # Check thresholds
+                self._check_memory_thresholds(memory_usage)
                 
+                # Wait for next check
                 await asyncio.sleep(self.check_interval)
+                
             except asyncio.CancelledError:
+                self.logger.debug("Memory monitoring task cancelled")
                 break
             except Exception as e:
-                if hasattr(self.logger, 'error'):
-                    self.logger.error(f"Error in memory monitoring: {e}", error=e)
-                else:
-                    logging.error(f"Error in memory monitoring: {e}")
-                await asyncio.sleep(self.check_interval * 2)  # Longer delay on error
-                
-    async def cleanup_memory(self) -> None:
+                self.logger.error(f"Error in memory monitoring: {str(e)}", exc_info=True)
+                await asyncio.sleep(self.check_interval)  # Wait before retrying
+    
+    def _check_memory_thresholds(self, memory_usage: float) -> None:
         """
-        Perform memory cleanup operations.
+        Check memory usage against thresholds and trigger alerts if needed.
         
-        This includes running garbage collection and executing registered cleanup callbacks.
+        Args:
+            memory_usage: Current memory usage in MB
         """
-        if hasattr(self.logger, 'info'):
-            self.logger.info("Performing memory cleanup")
-        else:
-            logging.info("Performing memory cleanup")
-            
-        # Get memory usage before cleanup
-        before_stats = self.get_memory_stats()
-        before_process_memory, _ = self.get_process_memory_usage()
-        
-        # Run registered cleanup callbacks
-        for callback in self._cleanup_callbacks:
-            try:
-                callback()
-            except Exception as e:
-                if hasattr(self.logger, 'error'):
-                    self.logger.error(f"Error in cleanup callback: {e}", error=e)
-                else:
-                    logging.error(f"Error in cleanup callback: {e}")
-        
-        # Force garbage collection
-        gc.collect()
-        
-        # Get memory usage after cleanup
-        after_stats = self.get_memory_stats()
-        after_process_memory, _ = self.get_process_memory_usage()
-        
-        # Calculate memory freed
-        memory_freed = before_process_memory - after_process_memory
-        
-        if hasattr(self.logger, 'info'):
-            self.logger.info(
-                f"Cleanup complete. Memory freed: {memory_freed / (1024 * 1024):.2f} MB. "
-                f"Current usage: {after_stats.percent_used:.1f}%",
-                memory_freed_mb=memory_freed / (1024 * 1024),
-                current_percent=after_stats.percent_used,
-                available_mb=after_stats.available_bytes / (1024 * 1024)
+        if memory_usage > self.critical_threshold:
+            # Critical alert
+            self._stats["critical_alerts"] += 1
+            alert = MemoryAlert(
+                timestamp=datetime.now(),
+                usage_mb=memory_usage,
+                threshold_mb=self.critical_threshold,
+                context={"level": "CRITICAL"}
             )
-        else:
-            logging.info(
-                f"Cleanup complete. Memory freed: {memory_freed / (1024 * 1024):.2f} MB. "
-                f"Current usage: {after_stats.percent_used:.1f}%"
+            self._recent_alerts.append(alert)
+            
+            # Log alert
+            self.logger.critical(
+                f"Critical memory usage: {memory_usage:.2f}MB "
+                f"(threshold: {self.critical_threshold:.2f}MB)"
             )
             
-    def get_memory_history(self) -> List[MemoryStats]:
-        """
-        Get historical memory usage data.
+            # Trigger garbage collection
+            saved = self._trigger_gc()
+            
+            # Log garbage collection results
+            self.logger.info(f"Emergency garbage collection freed {saved:.2f}MB")
+            
+        elif memory_usage > self.warning_threshold:
+            # Warning alert
+            self._stats["warnings"] += 1
+            alert = MemoryAlert(
+                timestamp=datetime.now(),
+                usage_mb=memory_usage,
+                threshold_mb=self.warning_threshold,
+                context={"level": "WARNING"}
+            )
+            self._recent_alerts.append(alert)
+            
+            # Log alert
+            self.logger.warning(
+                f"High memory usage: {memory_usage:.2f}MB "
+                f"(threshold: {self.warning_threshold:.2f}MB)"
+            )
+            
+            # Consider garbage collection if significantly over threshold
+            if memory_usage > self.warning_threshold * 1.5:
+                saved = self._trigger_gc()
+                self.logger.info(f"Preventive garbage collection freed {saved:.2f}MB")
         
-        Returns:
-            List of MemoryStats objects
-        """
-        with self._history_lock:
-            return list(self._memory_history)
-            
-    def get_memory_trend(self, minutes: int = 10) -> Dict[str, Any]:
-        """
-        Calculate memory usage trend over the specified time period.
-        
-        Args:
-            minutes: Time period in minutes
-            
-        Returns:
-            Dictionary with trend information
-        """
-        with self._history_lock:
-            if not self._memory_history:
-                return {
-                    "trend": "stable",
-                    "change_percent": 0.0,
-                    "samples": 0
-                }
-                
-            # Filter history by time
-            cutoff_time = datetime.now().timestamp() - (minutes * 60)
-            recent_history = [
-                stats for stats in self._memory_history
-                if stats.timestamp.timestamp() >= cutoff_time
-            ]
-            
-            if len(recent_history) < 2:
-                return {
-                    "trend": "stable",
-                    "change_percent": 0.0,
-                    "samples": len(recent_history)
-                }
-                
-            # Calculate trend
-            first = recent_history[0].percent_used
-            last = recent_history[-1].percent_used
-            change = last - first
-            
-            trend = "stable"
-            if change > 5.0:
-                trend = "increasing"
-            elif change < -5.0:
-                trend = "decreasing"
-                
-            return {
-                "trend": trend,
-                "change_percent": change,
-                "samples": len(recent_history),
-                "first_value": first,
-                "last_value": last,
-                "min_value": min(stats.percent_used for stats in recent_history),
-                "max_value": max(stats.percent_used for stats in recent_history),
-                "avg_value": sum(stats.percent_used for stats in recent_history) / len(recent_history)
-            }
-
-
-class MemoryOptimizer:
-    """
-    Memory optimization strategies for resource-constrained environments.
+        # Keep only recent alerts (last 10)
+        if len(self._recent_alerts) > 10:
+            self._recent_alerts = self._recent_alerts[-10:]
     
-    This class provides tools for optimizing memory usage, including
-    weak references, object pooling, and memory-efficient data structures.
-    """
+    def _get_memory_usage(self) -> float:
+        """
+        Get current memory usage in MB.
+        
+        Returns:
+            float: Memory usage in MB
+        """
+        try:
+            import psutil
+            process = psutil.Process(os.getpid())
+            memory_info = process.memory_info()
+            return memory_info.rss / (1024 * 1024)  # Convert to MB
+        except ImportError:
+            # Fallback if psutil is not available
+            import resource
+            usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+            if sys.platform == 'darwin':
+                # macOS returns bytes
+                return usage / 1024  # Convert to MB
+            else:
+                # Linux returns KB
+                return usage / 1024  # Convert to MB
     
-    @staticmethod
-    def use_weak_reference(obj: Any) -> weakref.ReferenceType:
+    def _trigger_gc(self) -> float:
         """
-        Create a weak reference to an object.
+        Trigger garbage collection to free memory.
         
-        Weak references allow the garbage collector to collect the object
-        if there are no strong references to it.
+        Returns:
+            float: Amount of memory freed in MB
+        """
+        # Get memory usage before GC
+        before = self._get_memory_usage()
+        
+        # Disable garbage collection during manual collection
+        gc_enabled = gc.isenabled()
+        if gc_enabled:
+            gc.disable()
+        
+        try:
+            # Run garbage collection
+            gc.collect(2)  # Full collection
+            self._stats["gc_collections"] += 1
+        finally:
+            # Restore previous garbage collection state
+            if gc_enabled:
+                gc.enable()
+        
+        # Get memory usage after GC
+        after = self._get_memory_usage()
+        
+        # Calculate memory saved
+        saved = max(0, before - after)
+        self._stats["memory_saved_mb"] += saved
+        
+        return saved
+    
+    def start_tracemalloc(self) -> None:
+        """Start detailed memory allocation tracking."""
+        if not self._tracemalloc_enabled:
+            tracemalloc.start()
+            self._tracemalloc_enabled = True
+            self.logger.info("Tracemalloc memory tracking enabled")
+    
+    def stop_tracemalloc(self) -> None:
+        """Stop detailed memory allocation tracking."""
+        if self._tracemalloc_enabled:
+            tracemalloc.stop()
+            self._tracemalloc_enabled = False
+            self.logger.info("Tracemalloc memory tracking disabled")
+    
+    def get_memory_snapshot(self) -> Optional[tracemalloc.Snapshot]:
+        """
+        Get current memory allocation snapshot.
+        
+        Returns:
+            tracemalloc.Snapshot or None if tracemalloc is not enabled
+        """
+        if not self._tracemalloc_enabled:
+            return None
+        
+        return tracemalloc.take_snapshot()
+    
+    def compare_snapshots(self, old_snapshot: tracemalloc.Snapshot, new_snapshot: tracemalloc.Snapshot) -> List[Tuple]:
+        """
+        Compare two memory snapshots to find memory leaks.
         
         Args:
-            obj: Object to create a weak reference to
+            old_snapshot: Previous memory snapshot
+            new_snapshot: Current memory snapshot
             
         Returns:
-            Weak reference to the object
+            List of (size_diff, traceback) tuples sorted by size difference
         """
-        return weakref.ref(obj)
+        if not self._tracemalloc_enabled:
+            return []
         
-    @staticmethod
-    def optimize_dict_memory(d: Dict) -> Dict:
+        # Get top differences
+        statistics = new_snapshot.compare_to(old_snapshot, 'traceback')
+        
+        # Return top differences
+        return [(stat.size_diff, stat.traceback) for stat in statistics[:10]]
+    
+    def get_memory_stats(self) -> Dict[str, Any]:
         """
-        Optimize memory usage of a dictionary.
+        Get memory statistics.
         
-        This method creates a copy of the dictionary with optimized memory usage.
-        
-        Args:
-            d: Dictionary to optimize
-            
         Returns:
-            Optimized dictionary
+            Dict with memory statistics
         """
-        return dict(d)  # This triggers dictionary resize
-        
-    @staticmethod
-    def clear_unused_memory() -> None:
-        """Force garbage collection and release memory to the OS."""
-        gc.collect()
-        
-        # On some systems, this can release memory back to the OS
-        if hasattr(gc, 'mem_free'):
-            gc.mem_free()
-            
-    @staticmethod
-    def get_object_size(obj: Any) -> int:
+        return {
+            "current_usage_mb": self._get_memory_usage(),
+            "peak_usage_mb": self._peak_memory,
+            "warning_threshold_mb": self.warning_threshold,
+            "critical_threshold_mb": self.critical_threshold,
+            "checks": self._stats["checks"],
+            "warnings": self._stats["warnings"],
+            "critical_alerts": self._stats["critical_alerts"],
+            "gc_collections": self._stats["gc_collections"],
+            "memory_saved_mb": self._stats["memory_saved_mb"],
+            "tracemalloc_enabled": self._tracemalloc_enabled,
+            "last_check": self._last_check
+        }
+    
+    def get_recent_alerts(self) -> List[MemoryAlert]:
         """
-        Get the approximate memory size of an object.
+        Get recent memory alerts.
         
-        Args:
-            obj: Object to measure
-            
         Returns:
-            Size in bytes
+            List of recent memory alerts
         """
-        import sys
-        return sys.getsizeof(obj)
-        
-    @staticmethod
-    def get_largest_objects(limit: int = 10) -> List[Tuple[Any, int]]:
+        return list(self._recent_alerts)
+    
+    def get_memory_report(self) -> str:
         """
-        Get the largest objects in memory.
+        Get formatted memory usage report.
         
-        Note: This is an expensive operation and should only be used for debugging.
-        
-        Args:
-            limit: Maximum number of objects to return
-            
         Returns:
-            List of (object, size) tuples
+            str: Formatted memory report
         """
-        import sys
-        import types
+        current = self._get_memory_usage()
+        stats = self.get_memory_stats()
         
-        # Get all objects
-        objects = []
-        for obj in gc.get_objects():
-            try:
-                if isinstance(obj, (types.ModuleType, type, types.FunctionType, types.MethodType)):
-                    continue  # Skip common system objects
-                size = sys.getsizeof(obj)
-                objects.append((obj, size))
-            except:
-                pass
-                
-        # Sort by size (descending) and return top N
-        objects.sort(key=lambda x: x[1], reverse=True)
-        return objects[:limit]
+        report = [
+            "Memory Usage Report",
+            "===================",
+            f"Current Usage: {current:.2f}MB",
+            f"Peak Usage: {stats['peak_usage_mb']:.2f}MB",
+            f"Warning Threshold: {self.warning_threshold:.2f}MB",
+            f"Critical Threshold: {self.critical_threshold:.2f}MB",
+            "",
+            "Statistics:",
+            f"- Memory Checks: {stats['checks']}",
+            f"- Warning Alerts: {stats['warnings']}",
+            f"- Critical Alerts: {stats['critical_alerts']}",
+            f"- GC Collections: {stats['gc_collections']}",
+            f"- Memory Saved: {stats['memory_saved_mb']:.2f}MB",
+            "",
+            "Recent Alerts:"
+        ]
+        
+        # Add recent alerts
+        for alert in self._recent_alerts:
+            report.append(
+                f"- {alert.timestamp.strftime('%Y-%m-%d %H:%M:%S')}: "
+                f"{alert.usage_mb:.2f}MB ({alert.context.get('level', 'ALERT')})"
+            )
+        
+        if not self._recent_alerts:
+            report.append("- No recent alerts")
+        
+        return "\n".join(report)
+
+# Global memory monitor instance
+memory_monitor = MemoryMonitor()

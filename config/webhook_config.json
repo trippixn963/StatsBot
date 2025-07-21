@@ -1,35 +1,35 @@
 {
   "webhooks": {
     "general": {
-      "url": "",
+      "url": "https://discord.com/api/webhooks/123456789/your_webhook_token_here",
       "min_level": "INFO",
       "max_retries": 3,
       "timeout": 10.0,
-      "enabled": false,
+      "enabled": true,
       "tags": ["general", "bot_status"]
     },
     "errors": {
-      "url": "",
+      "url": "https://discord.com/api/webhooks/123456789/your_error_webhook_token_here",
       "min_level": "ERROR",
       "max_retries": 5,
       "timeout": 15.0,
-      "enabled": false,
+      "enabled": true,
       "tags": ["errors", "critical"]
     },
     "member_events": {
-      "url": "",
+      "url": "https://discord.com/api/webhooks/123456789/your_member_events_webhook_token_here",
       "min_level": "INFO",
       "max_retries": 2,
       "timeout": 8.0,
-      "enabled": false,
+      "enabled": true,
       "tags": ["members", "events"]
     },
     "performance": {
-      "url": "",
+      "url": "https://discord.com/api/webhooks/123456789/your_performance_webhook_token_here",
       "min_level": "WARNING",
       "max_retries": 3,
       "timeout": 10.0,
-      "enabled": false,
+      "enabled": true,
       "tags": ["performance", "alerts"]
     }
   },

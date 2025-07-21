@@ -12,8 +12,33 @@ import logging
 from datetime import datetime
 import sys
 
-from ...core.exceptions import CacheError
+# Import models directly
 from ...types.models import CacheStats, CacheOperation
+
+# We'll define a local CacheError class to avoid circular imports
+class CacheError(Exception):
+    """
+    Raised when cache operations fail.
+    
+    This is a local version of the exception to avoid circular imports.
+    """
+    
+    def __init__(
+        self, 
+        message: str, 
+        cache_key: Optional[str] = None,
+        operation: Optional[str] = None
+    ):
+        super().__init__(message)
+        self.message = message
+        self.cache_key = cache_key
+        self.operation = operation
+        self.error_code = "CACHE_ERROR"
+        self.context = {}
+        if cache_key:
+            self.context['cache_key'] = cache_key
+        if operation:
+            self.context['operation'] = operation
 
 T = TypeVar('T')
 

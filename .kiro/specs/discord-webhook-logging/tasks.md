@@ -6,23 +6,6 @@ This implementation plan breaks down the Discord webhook logging feature into di
 
 ## Implementation Tasks
 
-- [x] 1. Core Webhook Infrastructure
-  - Create webhook configuration data models and validation
-  - Implement basic WebhookManager class with connection handling
-  - Add environment variable configuration loading
-  - Create basic webhook client with aiohttp integration
-  - Write unit tests for configuration validation and basic connectivity
-  - _Requirements: 1.1, 1.2, 1.3_
-
-- [x] 2. Message Formatting System
-  - Implement MessageFormatter class with template support
-  - Create default message templates for different log levels
-  - Add variable substitution system for dynamic content
-  - Implement Discord embed formatting with rich content
-  - Create message length validation and truncation
-  - Write unit tests for all formatting scenarios
-  - _Requirements: 2.1, 2.2, 2.3, 8.1, 8.2_
-
 - [ ] 3. Log Level Filtering and Routing
   - Implement LogFilters class with level-based routing
   - Create webhook routing configuration system

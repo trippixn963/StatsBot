@@ -1,9 +1,10 @@
 import os
 import signal
 import asyncio
+import logging
 import discord
 from src.utils.tree_log import log_run_header, log_run_end, log_error_with_traceback, log_perfect_tree_section
-from src.services.stats import StatsBot
+from src.core.bot import OptimizedStatsBot
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -30,7 +31,9 @@ async def main():
         log_run_header("StatsBot", "1.0.0")
         
         # Create bot
-        bot = StatsBot()
+        from src.core.config import load_config
+        config = load_config()
+        bot = OptimizedStatsBot(config)
         
         # Set up signal handlers
         signal.signal(signal.SIGINT, handle_shutdown)
