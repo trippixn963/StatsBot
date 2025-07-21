@@ -22,6 +22,7 @@ from datetime import datetime, timedelta, timezone
 import pytz
 from typing import Optional, List, Dict, Any
 from src.utils.tree_log import log_error_with_traceback, log_perfect_tree_section
+from src.services.webhook_logging import WebhookLoggingService
 import psutil
 import os
 import sys
@@ -83,7 +84,7 @@ class MonitoringService:
         update_interval (int): Heartbeat update interval in seconds
     """
     
-    def __init__(self, bot: discord.Client, heartbeat_channel_id: int):
+    def __init__(self, bot: discord.Client, heartbeat_channel_id: int, webhook_config: dict = None):
         self.bot = bot
         self.heartbeat_channel_id = heartbeat_channel_id
         # Use fixed EST timezone (UTC-5)
@@ -93,6 +94,11 @@ class MonitoringService:
         self.recent_logs: List[Dict] = []
         self.heartbeat_message: Optional[discord.Message] = None
         self.update_interval = 3600  # 1 hour in seconds
+        
+        # Initialize webhook logging service
+        self.webhook_service = WebhookLoggingService()
+        if webhook_config and webhook_config.get('webhook_logging'):
+            self.webhook_service.load_config(webhook_config['webhook_logging'])
         
         # Add our custom handler to the root logger
         logging.getLogger().addHandler(self.log_handler)
@@ -104,10 +110,19 @@ class MonitoringService:
                 ("status", "Initializing"),
                 ("heartbeat_channel", str(heartbeat_channel_id)),
                 ("timezone", "EST"),
-                ("update_interval", f"{self.update_interval // 3600} hour")
+                ("update_interval", f"{self.update_interval // 3600} hour"),
+                ("webhook_enabled", str(self.webhook_service.enabled))
             ],
             emoji="📡"
         )
+    
+    async def start_webhook_service(self):
+        """Start the webhook logging service."""
+        await self.webhook_service.start()
+    
+    async def stop_webhook_service(self):
+        """Stop the webhook logging service."""
+        await self.webhook_service.stop()
         
     def add_log_entry(self, message: str, level: str = "INFO"):
         """Add a log entry to recent logs"""
@@ -299,6 +314,16 @@ class MonitoringService:
                     # Log heartbeat update
                     metrics = self.get_system_metrics()
                     now = datetime.now(self.est_tz)
+                    
+                    # Send webhook notification for system status
+                    await self.webhook_service.log_heartbeat({
+                        'cpu_usage': f"{metrics['cpu_percent']:.1f}%",
+                        'memory_usage': f"{metrics['memory_percent']:.1f}%",
+                        'uptime': self.get_uptime(),
+                        'threads': metrics['threads'],
+                        'status': 'healthy'
+                    })
+                    
                     log_perfect_tree_section(
                         "Heartbeat Update",
                         [
@@ -313,6 +338,11 @@ class MonitoringService:
                     )
                     
                 except Exception as e:
+                    # Send critical alert via webhook
+                    await self.webhook_service.log_critical(
+                        f"Heartbeat update failed: {str(e)}",
+                        timestamp=datetime.now(self.est_tz).strftime('%I:%M:%S %p EST')
+                    )
                     log_error_with_traceback("Failed to update heartbeat", e)
                 
                 try:

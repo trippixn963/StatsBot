@@ -1,0 +1,45 @@
+{
+  "webhooks": {
+    "general": {
+      "url": "",
+      "min_level": "INFO",
+      "max_retries": 3,
+      "timeout": 10.0,
+      "enabled": false,
+      "tags": ["general", "bot_status"]
+    },
+    "errors": {
+      "url": "",
+      "min_level": "ERROR",
+      "max_retries": 5,
+      "timeout": 15.0,
+      "enabled": false,
+      "tags": ["errors", "critical"]
+    },
+    "member_events": {
+      "url": "",
+      "min_level": "INFO",
+      "max_retries": 2,
+      "timeout": 8.0,
+      "enabled": false,
+      "tags": ["members", "events"]
+    },
+    "performance": {
+      "url": "",
+      "min_level": "WARNING",
+      "max_retries": 3,
+      "timeout": 10.0,
+      "enabled": false,
+      "tags": ["performance", "alerts"]
+    }
+  },
+  "global_settings": {
+    "rate_limit_requests_per_second": 5.0,
+    "rate_limit_burst_size": 10,
+    "circuit_breaker_failure_threshold": 5,
+    "circuit_breaker_recovery_timeout": 300.0,
+    "message_queue_max_size": 1000,
+    "enable_pii_masking": true,
+    "enable_token_redaction": true
+  }
+} 

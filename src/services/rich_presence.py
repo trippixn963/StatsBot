@@ -82,6 +82,74 @@ class RichPresenceService:
                 emoji="❌"
             )
     
+    async def set_startup_presence(self):
+        """Set the initial presence when the bot starts up."""
+        try:
+            if not self.bot.guilds:
+                return
+                
+            guild = self.bot.guilds[0]
+            member_count = len(guild.members)
+            
+            activity = discord.Activity(
+                type=discord.ActivityType.watching,
+                name=f"👥 {member_count:,} members"
+            )
+            
+            await self.bot.change_presence(
+                status=discord.Status.online,
+                activity=activity
+            )
+            
+            log_perfect_tree_section(
+                "Rich Presence",
+                [
+                    ("status", "Startup presence set"),
+                    ("type", "member_count"),
+                    ("count", str(member_count))
+                ],
+                emoji="🚀"
+            )
+            
+        except Exception as e:
+            log_perfect_tree_section(
+                "Rich Presence Error",
+                [
+                    ("error", str(e)),
+                    ("presence_type", "startup")
+                ],
+                emoji="❌"
+            )
+    
+    async def set_shutdown_presence(self):
+        """Set the shutdown presence when the bot is shutting down."""
+        try:
+            activity = discord.Activity(
+                type=discord.ActivityType.watching,
+                name="🔄 Restarting..."
+            )
+            
+            await self.bot.change_presence(
+                status=discord.Status.dnd,
+                activity=activity
+            )
+            
+            log_perfect_tree_section(
+                "Rich Presence",
+                [("status", "Shutdown presence set")],
+                emoji="🛑"
+            )
+            
+        except Exception as e:
+            log_perfect_tree_section(
+                "Rich Presence Error",
+                [
+                    ("error", str(e)),
+                    ("presence_type", "shutdown")
+                ],
+                emoji="❌"
+            )
+    
     async def start(self):
         """Start the rich presence update loop."""
         await self.bot.wait_until_ready()

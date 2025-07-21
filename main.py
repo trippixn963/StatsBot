@@ -36,14 +36,30 @@ async def main():
         signal.signal(signal.SIGINT, handle_shutdown)
         signal.signal(signal.SIGTERM, handle_shutdown)
         
-        # Start the bot
+        # Start the bot with reconnect logic
         async with bot:
             # Set up shutdown handler
             bot.shutdown_event = shutdown_event
             
-            # Start bot and wait for shutdown signal
+            # Start bot and wait for shutdown signal with improved reconnect handling
             try:
-                await bot.start(os.getenv('BOT_TOKEN'))
+                # Configure Discord's internal reconnect settings
+                discord.client._log.setLevel(logging.INFO)
+                
+                # Log connection attempt
+                log_perfect_tree_section(
+                    "Bot Connection",
+                    [("status", "Connecting to Discord")],
+                    emoji="🔌"
+                )
+                
+                # Start with reconnect enabled
+                await bot.start(os.getenv('BOT_TOKEN'), reconnect=True)
+                
+            except discord.errors.LoginFailure as e:
+                log_error_with_traceback("Invalid bot token", e, "CRITICAL")
+                return
+                
             except asyncio.CancelledError:
                 # Log graceful shutdown
                 log_perfect_tree_section(
@@ -51,42 +67,57 @@ async def main():
                     [("status", "Received shutdown signal")],
                     emoji="🔄"
                 )
+                
+            except Exception as e:
+                log_error_with_traceback("Connection error", e, "ERROR")
+                
             finally:
                 # Set shutdown presence
                 if hasattr(bot, 'rich_presence_service'):
-                    await bot.rich_presence_service.set_shutdown_presence()
+                    try:
+                        await bot.rich_presence_service.set_shutdown_presence()
+                    except Exception as e:
+                        log_error_with_traceback("Failed to set shutdown presence", e)
                 
                 # Cancel background tasks
+                tasks_to_cancel = []
                 if hasattr(bot, 'bg_task'):
-                    bot.bg_task.cancel()
+                    tasks_to_cancel.append(bot.bg_task)
                 if hasattr(bot, 'heartbeat_task'):
-                    bot.heartbeat_task.cancel()
+                    tasks_to_cancel.append(bot.heartbeat_task)
                 if hasattr(bot, 'rich_presence_task'):
-                    bot.rich_presence_task.cancel()
+                    tasks_to_cancel.append(bot.rich_presence_task)
+                
+                # Cancel all tasks
+                for task in tasks_to_cancel:
+                    if not task.done():
+                        task.cancel()
                 
                 # Wait for tasks to complete
-                try:
-                    if hasattr(bot, 'bg_task'):
-                        await asyncio.wait_for(bot.bg_task, timeout=5.0)
-                    if hasattr(bot, 'heartbeat_task'):
-                        await asyncio.wait_for(bot.heartbeat_task, timeout=5.0)
-                    if hasattr(bot, 'rich_presence_task'):
-                        await asyncio.wait_for(bot.rich_presence_task, timeout=5.0)
-                except asyncio.TimeoutError:
-                    log_perfect_tree_section(
-                        "Task Cancellation",
-                        [("status", "Force cancelled tasks after timeout")],
-                        emoji="⚠️"
-                    )
-                except Exception as e:
-                    log_error_with_traceback("Error cancelling tasks", e)
+                if tasks_to_cancel:
+                    try:
+                        await asyncio.wait(tasks_to_cancel, timeout=5.0)
+                    except asyncio.TimeoutError:
+                        log_perfect_tree_section(
+                            "Task Cancellation",
+                            [("status", "Force cancelled tasks after timeout")],
+                            emoji="⚠️"
+                        )
+                    except Exception as e:
+                        log_error_with_traceback("Error cancelling tasks", e)
                 
                 # Save any pending data
-                if hasattr(bot, 'stats_tracker'):
-                    await bot.stats_tracker.save_data()
+                if hasattr(bot, 'stats_service') and hasattr(bot.stats_service, 'stats_tracker'):
+                    try:
+                        await bot.stats_service.save_data()
+                    except Exception as e:
+                        log_error_with_traceback("Failed to save data", e)
                 
                 # Close connections
-                await bot.close()
+                try:
+                    await bot.close()
+                except Exception as e:
+                    log_error_with_traceback("Error closing bot connection", e)
                 
                 # Log successful shutdown
                 log_perfect_tree_section(

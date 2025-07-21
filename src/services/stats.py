@@ -415,9 +415,10 @@ class StatsBot(discord.Client):
         intents.presences = True  # Required for accurate online status tracking
         super().__init__(intents=intents)
         
-        # Initialize services
+        # Initialize services with webhook config
+        from config.config import config as bot_config
         self.stats_service = StatsService(self)
-        self.monitoring_service = MonitoringService(self, int(os.getenv('HEARTBEAT_CHANNEL_ID')))
+        self.monitoring_service = MonitoringService(self, int(os.getenv('HEARTBEAT_CHANNEL_ID')), bot_config)
         self.rich_presence_service = RichPresenceService(self)
         self.credits_service = CreditsService(self)
         self.shutdown_event = None
@@ -436,11 +437,37 @@ class StatsBot(discord.Client):
             [("status", "Starting"), ("type", "Channel Updates")],
             emoji="🔄"
         )
+        
+        # Initialize slash commands first to ensure they're ready
+        try:
+            await self.credits_service.setup_commands()
+            log_perfect_tree_section(
+                "Credits Commands",
+                [("status", "Registered"), ("commands", "/credits")],
+                emoji="📝"
+            )
+        except Exception as e:
+            from src.utils.tree_log import log_error_with_traceback
+            log_error_with_traceback("Failed to setup credits commands", e)
+        
+                # Start webhook service first
+        try:
+            await self.monitoring_service.start_webhook_service()
+        except Exception as e:
+            from src.utils.tree_log import log_error_with_traceback
+            log_error_with_traceback("Failed to start webhook service", e)
+        
+        # Start background tasks
         self.bg_task = self.loop.create_task(self.background_task())
         self.heartbeat_task = self.loop.create_task(self.monitoring_service.update_heartbeat())
         self.rich_presence_task = self.loop.create_task(self.rich_presence_service.start())
-        await self.stats_service.start_daily_stats_task()  # Start daily stats task
-        await self.credits_service.setup_commands()  # Setup slash commands
+        
+        # Start daily stats task
+        try:
+            await self.stats_service.start_daily_stats_task()
+        except Exception as e:
+            from src.utils.tree_log import log_error_with_traceback
+            log_error_with_traceback("Failed to start daily stats task", e)
         
     async def background_task(self):
         """Background task to update channel statistics."""
@@ -505,17 +532,43 @@ class StatsBot(discord.Client):
         )
         
         # Set startup rich presence
-        await self.rich_presence_service.set_startup_presence()
-        
-        # Sync slash commands
         try:
+            await self.rich_presence_service.set_startup_presence()
+        except Exception as e:
+            from src.utils.tree_log import log_error_with_traceback
+            log_error_with_traceback("Failed to set startup presence", e)
+        
+        # Ensure credits commands are set up
+        try:
+            await self.credits_service.setup_commands()
+            log_perfect_tree_section(
+                "Credits Service",
+                [("status", "Commands registered")],
+                emoji="💳"
+            )
+        except Exception as e:
+            from src.utils.tree_log import log_error_with_traceback
+            log_error_with_traceback("Failed to set up credits commands", e)
+        
+        # Sync slash commands with force sync to ensure they're registered
+        try:
+            # Force sync to all guilds
             synced = await self.tree.sync()
+            
+            # Log the synced commands
+            command_names = [cmd.name for cmd in self.tree.get_commands()]
+            
             log_perfect_tree_section(
                 "Slash Commands",
-                [("status", "Synced"), ("count", str(len(synced)))],
+                [
+                    ("status", "Synced"),
+                    ("count", str(len(synced))),
+                    ("commands", ", ".join(command_names))
+                ],
                 emoji="⚡"
             )
         except Exception as e:
+            from src.utils.tree_log import log_error_with_traceback
             log_error_with_traceback("Failed to sync slash commands", e)
         
     async def on_member_join(self, member: discord.Member):
